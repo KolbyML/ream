@@ -17,6 +17,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
+use tracing::info;
 
 use crate::config::NetworkConfig;
 
@@ -64,14 +65,14 @@ impl Discovery {
             }
 
             let _ = discv5.add_enr(bootnode_enr).map_err(|e| {
-                println!("Discv5 service failed. Error: {:?}", e);
+                info!("Discv5 service failed. Error: {:?}", e);
             });
         }
 
         // init ports
         let event_stream = if !config.disable_discovery {
             discv5.start().map_err(|e| e.to_string()).await?;
-            println!("Started discovery");
+            info!("Started discovery");
             // EventStream::Awaiting(Box::pin(discv5.event_stream()))
             EventStream::Inactive
         } else {
@@ -90,7 +91,7 @@ impl Discovery {
     pub fn discover_peers(&mut self, target_peers: usize) {
         // If the discv5 service isn't running or we are in the process of a query, don't bother
         // queuing a new one.
-        println!("Discovering peers {:?}", self.discv5.local_enr());
+        info!("Discovering peers {:?}", self.discv5.local_enr());
 
         if !self.started || self.find_peer_active {
             return;
@@ -104,7 +105,7 @@ impl Discovery {
         let mut processed = false;
 
         while let Poll::Ready(Some(query)) = self.discovery_queries.poll_next_unpin(cx) {
-            println!("query{:?} {:?}", query.result, query.query_type);
+            info!("query{:?} {:?}", query.result, query.query_type);
             processed = true;
             // TODO: add query types and push them to mesh
         }
@@ -112,7 +113,7 @@ impl Discovery {
     }
 
     fn start_query(&mut self, query: QueryType, _total_peers: usize) {
-        println!("Query! queryType={:?}", query);
+        info!("Query! queryType={:?}", query);
     }
 }
 
@@ -161,7 +162,7 @@ impl NetworkBehaviour for Discovery {
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        println!("Swarm event: {:?}", event);
+        info!("Discv5 on swarm event gotten: {:?}", event);
     }
 
     fn on_connection_handler_event(
@@ -170,7 +171,7 @@ impl NetworkBehaviour for Discovery {
         _connection_id: ConnectionId,
         _event: THandlerOutEvent<Self>,
     ) {
-        println!("ConnectionHandlerOutEvent");
+        info!("ConnectionHandlerOutEvent");
     }
 
     fn poll(
@@ -180,7 +181,7 @@ impl NetworkBehaviour for Discovery {
         self.process_queries(cx);
 
         match self.event_stream {
-            EventStream::Inactive => println!("inactive"),
+            EventStream::Inactive => info!("return of the mac"),
         };
 
         Poll::Pending

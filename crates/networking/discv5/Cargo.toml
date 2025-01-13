@@ -11,8 +11,9 @@ version.workspace = true
 
 [dependencies]
 
-discv5 = { workspace = true }
-futures = { workspace = true }
-libp2p-identity = { workspace = true }
-libp2p-mplex = { workspace = true }
-libp2p = { workspace = true }
+discv5.workspace = true
+futures.workspace = true
+libp2p-identity.workspace = true
+libp2p-mplex.workspace = true
+libp2p.workspace = true
+tracing.workspace = true

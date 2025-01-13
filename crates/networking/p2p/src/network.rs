@@ -1,5 +1,6 @@
 use std::{
     fmt::Debug,
+    net::Ipv4Addr,
     num::{NonZeroU8, NonZeroUsize},
     pin::Pin,
     time::Duration,
@@ -11,12 +12,15 @@ use libp2p::{
     identify,
     multiaddr::Protocol,
     noise,
-    swarm::{NetworkBehaviour, SwarmEvent},
+    swarm::{handler::multi, NetworkBehaviour, SwarmEvent},
     yamux, Multiaddr, PeerId, Swarm, SwarmBuilder, Transport,
 };
 use libp2p_identity::{secp256k1, Keypair, PublicKey};
 use ream_discv5::{config::NetworkConfig, discovery::Discovery};
 use ream_executor::ReamExecutor;
+use tracing::info;
+
+use crate::bootnodes::Bootnodes;
 
 #[derive(NetworkBehaviour)]
 pub(crate) struct ReamBehaviour {
@@ -124,20 +128,39 @@ impl Network {
     }
 
     async fn start_network_worker(&mut self, _config: &NetworkConfig) -> Result<(), String> {
-        println!("Libp2p starting .... ");
+        info!("Libp2p starting .... ");
 
-        let mut multi_addr: Multiaddr = "/ip4/127.0.0.1".parse().unwrap();
-        multi_addr.push(Protocol::Tcp(10000));
+        let mut multi_addr: Multiaddr = Ipv4Addr::UNSPECIFIED.into();
+        multi_addr.push(Protocol::Tcp(9000));
+        multi_addr.push(Ipv4Addr::UNSPECIFIED.into());
+        multi_addr.push(Protocol::Udp(9000));
 
         match self.swarm.listen_on(multi_addr.clone()) {
             Ok(_) => {
-                println!(
+                info!(
                     "Listening on {:?} with peer_id {:?}",
                     multi_addr, self.peer_id
                 );
             }
             Err(_) => {
-                println!("Failed to start libp2p peer listen on {:?}", multi_addr);
+                info!("Failed to start libp2p peer listen on {:?}", multi_addr);
+            }
+        }
+
+        let bootnodes = Bootnodes::new();
+
+        for bootnode in bootnodes.bootnodes {
+            if let Some(ipv4) = bootnode.ip4() {
+                let mut multi_addr = Multiaddr::empty();
+                if let Some(tcp_port) = bootnode.tcp4() {
+                    multi_addr.push(ipv4.into());
+                    multi_addr.push(Protocol::Tcp(tcp_port));
+                }
+                // if let Some(udp_port) = bootnode.udp4() {
+                //     multi_addr.push(ipv4.into());
+                //     multi_addr.push(Protocol::Udp(udp_port));
+                // }
+                self.swarm.dial(multi_addr).unwrap();
             }
         }
 
@@ -162,6 +185,7 @@ impl Network {
         event: SwarmEvent<ReamBehaviourEvent>,
     ) -> Option<ReamNetworkEvent> {
         // currently no-op for any network events
+        info!("Event: {:?}", event);
         match event {
             SwarmEvent::Behaviour(behaviour_event) => match behaviour_event {
                 ReamBehaviourEvent::Identify(_) => None,
