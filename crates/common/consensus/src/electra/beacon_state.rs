@@ -2921,6 +2921,7 @@ impl BeaconState {
 
     pub fn validator_balance_inclusion_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
         const BALANCES_DEPTH: u64 = 7 + 1 + 40;
+        println!("bye 1");
         // inclusion proof for blob_kzg_commitment in blob_kzg_commitments
         let tree = merkle_tree(
             self.balances
@@ -2930,12 +2931,17 @@ impl BeaconState {
                 .as_slice(),
             BALANCES_DEPTH,
         )?;
+        println!("bye 2");
+
         let validator_balance_to_validator_balances_proof =
             generate_proof(&tree, index, BALANCES_DEPTH)?;
+        println!("bye 3");
 
         // add branch for length of balances
         let validator_balances_length_root = self.balances.len().to_le_bytes().tree_hash_root();
         let validator_balances_to_beacon_state_proof = self.data_inclusion_proof(12)?;
+        println!("bye 4");
+
         Ok([
             validator_balance_to_validator_balances_proof,
             vec![validator_balances_length_root],
