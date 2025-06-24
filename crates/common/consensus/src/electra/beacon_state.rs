@@ -2919,7 +2919,7 @@ impl BeaconState {
         .concat())
     }
 
-    pub fn validator_balance_inclusion_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
+    pub fn validator_balances_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
         // constrain the depth to 23 instead of 40
         const BALANCES_DEPTH: u64 = 17;
         println!("bye 1");
@@ -2938,17 +2938,15 @@ impl BeaconState {
             generate_proof(&tree, index, BALANCES_DEPTH)?;
         println!("bye 3");
 
+        Ok([validator_balance_to_validator_balances_proof].concat())
+    }
+
+    pub fn balances_to_state_proof(&self) -> anyhow::Result<Vec<B256>> {
         // add branch for length of balances
-        let validator_balances_length_root = self.balances.len().to_le_bytes().tree_hash_root();
         let validator_balances_to_beacon_state_proof = self.data_inclusion_proof(12)?;
         println!("bye 4");
 
-        Ok([
-            validator_balance_to_validator_balances_proof,
-            vec![validator_balances_length_root],
-            validator_balances_to_beacon_state_proof,
-        ]
-        .concat())
+        Ok([validator_balances_to_beacon_state_proof].concat())
     }
 
     pub fn state_root(&self) -> B256 {
