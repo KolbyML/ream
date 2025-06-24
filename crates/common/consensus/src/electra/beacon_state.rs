@@ -2919,33 +2919,9 @@ impl BeaconState {
         .concat())
     }
 
-    pub fn validator_balances_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
-        // constrain the depth to 23 instead of 40
-        const BALANCES_DEPTH: u64 = 17;
-        println!("bye 1");
-        // inclusion proof for blob_kzg_commitment in blob_kzg_commitments
-        let tree = merkle_tree(
-            self.balances
-                .iter()
-                .map(|balance| balance.to_le_bytes().tree_hash_root())
-                .collect::<Vec<_>>()
-                .as_slice(),
-            BALANCES_DEPTH,
-        )?;
-        println!("bye 2");
-
-        let validator_balance_to_validator_balances_proof =
-            generate_proof(&tree, index, BALANCES_DEPTH)?;
-        println!("bye 3");
-
-        Ok([validator_balance_to_validator_balances_proof].concat())
-    }
-
-    pub fn balances_to_state_proof(&self) -> anyhow::Result<Vec<B256>> {
+    pub fn balances_to_state_root_proof(&self) -> anyhow::Result<Vec<B256>> {
         // add branch for length of balances
         let validator_balances_to_beacon_state_proof = self.data_inclusion_proof(12)?;
-        println!("bye 4");
-
         Ok([validator_balances_to_beacon_state_proof].concat())
     }
 
