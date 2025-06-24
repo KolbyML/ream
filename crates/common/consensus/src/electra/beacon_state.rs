@@ -2920,7 +2920,7 @@ impl BeaconState {
     }
 
     pub fn validator_balance_inclusion_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
-        const BALANCES_DEPTH: u64 = 7 + 1 + 40;
+        const BALANCES_DEPTH: u64 = 6;
         println!("bye 1");
         // inclusion proof for blob_kzg_commitment in blob_kzg_commitments
         let tree = merkle_tree(
