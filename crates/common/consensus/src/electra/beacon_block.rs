@@ -1,6 +1,7 @@
 use alloy_primitives::B256;
 use anyhow::ensure;
 use ream_bls::BLSSignature;
+use ream_merkle::{generate_proof, merkle_tree};
 use serde::{Deserialize, Serialize};
 use ssz_derive::{Decode, Encode};
 use tree_hash::TreeHash;
@@ -10,6 +11,7 @@ use super::beacon_block_body::BeaconBlockBody;
 use crate::{
     beacon_block_header::{BeaconBlockHeader, SignedBeaconBlockHeader},
     blob_sidecar::BlobSidecar,
+    constants::BLOCK_BODY_MERKLE_DEPTH,
     execution_engine::rpc_types::get_blobs::{Blob, BlobAndProofV1},
     polynomial_commitments::kzg_proof::KZGProof,
 };
@@ -87,5 +89,24 @@ pub struct BeaconBlock {
 impl BeaconBlock {
     pub fn block_root(&self) -> B256 {
         self.tree_hash_root()
+    }
+
+    pub fn merkle_leaves(&self) -> Vec<B256> {
+        vec![
+            self.slot.tree_hash_root(),
+            self.proposer_index.tree_hash_root(),
+            self.parent_root.tree_hash_root(),
+            self.state_root.tree_hash_root(),
+            self.body.tree_hash_root(),
+        ]
+    }
+
+    pub fn data_inclusion_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
+        let tree = merkle_tree(&self.merkle_leaves(), 2)?;
+        generate_proof(&tree, index, 2)
+    }
+
+    pub fn slot_proof(&self) -> anyhow::Result<Vec<B256>> {
+        self.data_inclusion_proof(0)
     }
 }
