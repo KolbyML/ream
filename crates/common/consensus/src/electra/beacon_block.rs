@@ -107,7 +107,7 @@ impl BeaconBlock {
         generate_proof(&tree, index, DEPTH)
     }
 
-    pub fn slot_proof(&self) -> anyhow::Result<Vec<B256>> {
+    pub fn state_root_proof(&self) -> anyhow::Result<Vec<B256>> {
         self.data_inclusion_proof(3)
     }
 }
