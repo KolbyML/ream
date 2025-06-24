@@ -13,21 +13,26 @@ use index::{generalized_index_child, get_generalized_index_bit, get_subtree_inde
 
 pub fn merkle_tree(leaves: &[B256], depth: u64) -> anyhow::Result<Vec<B256>> {
     let num_of_leaves = leaves.len();
+    println!("pl {}", num_of_leaves);
     let bottom_length = 1 << depth;
+    println!("pl 1 {} {}", depth, bottom_length);
     ensure!(
         num_of_leaves <= bottom_length,
         "Number of leaves is greater than the bottom length (depth too small)"
     );
 
+    println!("pl 2");
     let mut tree = vec![B256::ZERO; bottom_length];
     tree.extend(leaves);
     tree.extend(vec![B256::ZERO; bottom_length - num_of_leaves]);
+    println!("pl 3");
 
     for i in (1..bottom_length).rev() {
         let left = tree[i * 2].as_slice();
         let right = tree[i * 2 + 1].as_slice();
         tree[i] = hash_concat(left, right);
     }
+    println!("pl 4");
 
     Ok(tree)
 }
