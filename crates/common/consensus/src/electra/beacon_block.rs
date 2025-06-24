@@ -107,6 +107,6 @@ impl BeaconBlock {
     }
 
     pub fn slot_proof(&self) -> anyhow::Result<Vec<B256>> {
-        self.data_inclusion_proof(0)
+        self.data_inclusion_proof(3)
     }
 }
