@@ -102,8 +102,9 @@ impl BeaconBlock {
     }
 
     pub fn data_inclusion_proof(&self, index: u64) -> anyhow::Result<Vec<B256>> {
-        let tree = merkle_tree(&self.merkle_leaves(), 2)?;
-        generate_proof(&tree, index, 2)
+        const DEPTH: u64 = 3;
+        let tree = merkle_tree(&self.merkle_leaves(), DEPTH)?;
+        generate_proof(&tree, index, DEPTH)
     }
 
     pub fn slot_proof(&self) -> anyhow::Result<Vec<B256>> {
