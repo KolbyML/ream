@@ -2927,7 +2927,7 @@ impl BeaconState {
         let tree = merkle_tree(
             self.balances
                 .iter()
-                .map(|balance| balance.tree_hash_root())
+                .map(|balance| balance.to_le_bytes().tree_hash_root())
                 .collect::<Vec<_>>()
                 .as_slice(),
             BALANCES_DEPTH,
