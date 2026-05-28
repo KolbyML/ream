@@ -69,9 +69,13 @@ fn load_test_keys() -> anyhow::Result<HashMap<u64, PrivateKey>> {
             .map_err(|err| anyhow!("Failed to read key file {i}.json: {err}"))?;
         let key_json: serde_json::Value = serde_json::from_str(&content)
             .map_err(|err| anyhow!("Failed to parse key file {i}.json: {err}"))?;
-        let secret_hex = key_json["secret"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Missing secret field in key file {i}.json"))?;
+        let secret_hex = key_json
+            .get("proposal_keypair")
+            .and_then(|keypair| keypair.get("secret_key"))
+            .or_else(|| key_json.get("secret_key"))
+            .or_else(|| key_json.get("secret"))
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| anyhow!("Missing proposal secret field in key file {i}.json"))?;
         let secret_bytes = hex::decode(secret_hex.trim_start_matches("0x"))
             .map_err(|err| anyhow!("Failed to decode secret hex for validator {i}: {err}"))?;
         let private_key = PrivateKey::from_bytes(&secret_bytes)

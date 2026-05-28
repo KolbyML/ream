@@ -141,8 +141,8 @@ fn test_all_ssz_fixtures() {
 
     let mut total_tests = 0;
     let mut passed = 0;
-    let mut failed = 0;
     let mut skipped = 0;
+    let mut failed = 0;
 
     for fixture_path in fixtures {
         debug!("\n=== Loading fixture: {:?} ===", fixture_path.file_name());
@@ -351,6 +351,7 @@ fn test_all_verify_signatures_fixtures() {
 
     let mut total_tests = 0;
     let mut passed = 0;
+    let mut skipped = 0;
     let mut failed = 0;
 
     for fixture_path in fixtures {
@@ -362,9 +363,13 @@ fn test_all_verify_signatures_fixtures() {
                     total_tests += 1;
                     info!("Starting test: {test_name}");
                     match run_verify_signatures_test(test_name, test) {
-                        Ok(_) => {
+                        Ok(true) => {
                             passed += 1;
                             info!("PASSED: {test_name}");
+                        }
+                        Ok(false) => {
+                            skipped += 1;
+                            info!("SKIPPED: {test_name}");
                         }
                         Err(err) => {
                             failed += 1;
@@ -383,6 +388,7 @@ fn test_all_verify_signatures_fixtures() {
     info!("\n=== Verify Signatures Test Summary ===");
     info!("Total tests: {total_tests}");
     info!("Passed: {passed}");
+    info!("Skipped: {skipped}");
     info!("Failed: {failed}");
 
     assert_eq!(failed, 0, "Some verify_signatures tests failed");

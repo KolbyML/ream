@@ -19,6 +19,7 @@ use ream_consensus_lean::{
     state::LeanState,
     validator::Validator,
 };
+use ream_post_quantum_crypto::lean_multisig::aggregate::verify_aggregate_signature;
 use ream_post_quantum_crypto::leansig::{
     public_key::PublicKey,
     signature::{SIGNATURE_SIZE, Signature},
@@ -26,8 +27,9 @@ use ream_post_quantum_crypto::leansig::{
 use serde::Deserialize;
 use ssz_types::{
     BitList, VariableList,
-    typenum::{U1024, U262144, U1073741824},
+    typenum::{U1024, U262144, U1048576, U1073741824},
 };
+use tree_hash::TreeHash;
 
 // ============================================================================
 // Helpers
@@ -56,6 +58,14 @@ fn decode_signature(hex: &str) -> anyhow::Result<Signature> {
         bytes.len()
     );
     Ok(Signature::from(&bytes[..]))
+}
+
+fn decode_proof_wire(hex: &str) -> anyhow::Result<Vec<u8>> {
+    let bytes = decode_hex(hex)?;
+    if bytes.len() >= 4 && u32::from_le_bytes(bytes[..4].try_into()?) == 4 {
+        return Ok(bytes[4..].to_vec());
+    }
+    Ok(bytes)
 }
 
 // ============================================================================
@@ -372,17 +382,81 @@ impl TryFrom<&BlockSignaturesJSON> for BlockSignatures {
 #[serde(rename_all = "camelCase")]
 pub struct SignedBlockJSON {
     pub block: BlockJSON,
-    pub signature: BlockSignaturesJSON,
+    #[serde(default)]
+    pub signature: Option<BlockSignaturesJSON>,
+    #[serde(default)]
+    pub proof: Option<ProofDataJSON>,
 }
 
 impl TryFrom<&SignedBlockJSON> for SignedBlock {
     type Error = anyhow::Error;
 
     fn try_from(value: &SignedBlockJSON) -> anyhow::Result<Self> {
+        let signature = value
+            .signature
+            .as_ref()
+            .ok_or_else(|| anyhow!("SignedBlock fixture is missing signature"))?;
+
         Ok(Self {
             block: (&value.block).try_into()?,
-            signature: (&value.signature).try_into()?,
+            signature: signature.try_into()?,
         })
+    }
+}
+
+#[derive(Debug, Clone, ssz_derive::Encode)]
+pub struct SignedBlockProofSSZ {
+    pub block: Block,
+    pub proof: VariableList<u8, U1048576>,
+}
+
+impl TryFrom<&SignedBlockJSON> for SignedBlockProofSSZ {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &SignedBlockJSON) -> anyhow::Result<Self> {
+        let proof = value
+            .proof
+            .as_ref()
+            .ok_or_else(|| anyhow!("SignedBlock fixture is missing proof"))?;
+
+        Ok(Self {
+            block: (&value.block).try_into()?,
+            proof: VariableList::try_from(decode_hex(&proof.data)?)
+                .map_err(|err| anyhow!("Failed to convert SignedBlock proof: {err}"))?,
+        })
+    }
+}
+
+impl SignedBlockJSON {
+    pub fn verify_signatures(&self, parent_state: &LeanState) -> anyhow::Result<()> {
+        if self.signature.is_some() {
+            let signed_block = SignedBlock::try_from(self)?;
+            signed_block.verify_signatures(parent_state, true)?;
+            return Ok(());
+        }
+
+        let proof = self
+            .proof
+            .as_ref()
+            .ok_or_else(|| anyhow!("SignedBlock fixture is missing signature/proof"))?;
+        let block = Block::try_from(&self.block)?;
+        ensure!(
+            block.body.attestations.is_empty(),
+            "SignedBlock proof fixtures with body attestations require Type-2 multi-message proof verification"
+        );
+        let proposer = parent_state
+            .validators
+            .get(block.proposer_index as usize)
+            .ok_or_else(|| anyhow!("Proposer index out of range"))?;
+        let proof_data = decode_proof_wire(&proof.data)?;
+
+        verify_aggregate_signature(
+            &[proposer.proposal_public_key],
+            &block.tree_hash_root(),
+            &proof_data,
+            block.slot as u32,
+        )
+        .map_err(|err| anyhow!("Proposer block signature verification failed: {err}"))
     }
 }
 
@@ -390,6 +464,7 @@ impl TryFrom<&SignedBlockJSON> for SignedBlock {
 #[serde(rename_all = "camelCase")]
 pub struct AggregatedSignatureProofJSON {
     pub participants: DataListJSON<bool>,
+    #[serde(alias = "proof")]
     pub proof_data: ProofDataJSON,
 }
 

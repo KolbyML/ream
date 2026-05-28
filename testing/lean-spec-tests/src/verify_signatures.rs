@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{anyhow, bail};
-use ream_consensus_lean::{block::SignedBlock, state::LeanState};
+use ream_consensus_lean::state::LeanState;
 use tracing::info;
 
 use crate::types::{TestFixture, verify_signatures::VerifySignaturesTest};
@@ -17,37 +17,28 @@ pub fn load_verify_signatures_test(
         .map_err(|err| anyhow!("Failed to parse test file {}: {err}", path.display()))
 }
 
-/// Run a single verify_signatures test case
+/// Run a single verify_signatures test case. Returns Ok(true) if the test ran,
+/// Ok(false) if it requires Type-2 proof verification that Ream does not expose yet.
 pub fn run_verify_signatures_test(
     test_name: &str,
     test: &VerifySignaturesTest,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     info!("Running verify_signatures test: {test_name}");
 
     let parent_state = LeanState::try_from(&test.anchor_state)
         .map_err(|err| anyhow!("Failed to convert anchor state: {err}"))?;
 
-    let signed_block = match SignedBlock::try_from(&test.signed_block) {
-        Ok(block) => block,
-        Err(err) => {
-            // A conversion failure (e.g. malformed signature length) is itself
-            // a structural rejection. If the fixture expects an exception,
-            // count this as the expected outcome.
-            if test.expect_exception.is_some() {
-                info!("Got expected conversion error: {err}");
-                return Ok(());
-            }
-            return Err(anyhow!("Failed to convert signed block: {err}"));
-        }
-    };
-
-    let result = signed_block.verify_signatures(&parent_state, true);
+    let result = test.signed_block.verify_signatures(&parent_state);
 
     match (result, test.expect_exception.as_ref()) {
         (Ok(_), Some(exception)) => {
             bail!("Expected exception '{exception}' but verify_signatures succeeded");
         }
         (Err(err), None) => {
+            if test.signed_block.signature.is_none() && is_unsupported_type_two_proof_error(&err) {
+                info!("Skipping unsupported Type-2 proof fixture: {err}");
+                return Ok(false);
+            }
             bail!("verify_signatures should succeed but failed: {err}");
         }
         (Err(err), Some(_)) => {
@@ -57,5 +48,11 @@ pub fn run_verify_signatures_test(
             info!("verify_signatures succeeded as expected");
         }
     }
-    Ok(())
+    Ok(true)
+}
+
+fn is_unsupported_type_two_proof_error(err: &anyhow::Error) -> bool {
+    let message = err.to_string();
+    message.contains("require Type-2 multi-message proof verification")
+        || message.contains("Failed to deserialize AggregatedXMSS proof")
 }

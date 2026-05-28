@@ -616,11 +616,9 @@ pub async fn run_verify_signatures(
     let result = (|| -> anyhow::Result<()> {
         let parent_state = LeanState::try_from(&request.anchor_state)
             .map_err(|err| anyhow!("failed to convert anchor state: {err}"))?;
-        let signed_block = SignedBlock::try_from(&request.signed_block)
-            .map_err(|err| anyhow!("failed to convert signed block: {err}"))?;
-        signed_block
-            .verify_signatures(&parent_state, true)
-            .map(|_| ())
+        request
+            .signed_block
+            .verify_signatures(&parent_state)
             .map_err(|err| anyhow!("verify_signatures failed: {err}"))
     })();
 

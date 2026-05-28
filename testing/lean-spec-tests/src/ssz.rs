@@ -23,8 +23,8 @@ use crate::types::{
         AggregatedAttestationJSON, AggregatedSignatureProofJSON, AttestationDataJSON,
         AttestationJSON, BlockBodyJSON, BlockHeaderJSON, BlockJSON, BlockSignaturesJSON,
         BlocksByRootRequestJSON, BlocksByRootRequestSSZ, CheckpointJSON, ConfigJSON, PublicKeyJSON,
-        SSZTest, SignatureJSON, SignedAttestationJSON, SignedBlockJSON, StateJSON, StatusJSON,
-        ValidatorJSON,
+        SSZTest, SignatureJSON, SignedAttestationJSON, SignedBlockJSON, SignedBlockProofSSZ,
+        StateJSON, StatusJSON, ValidatorJSON,
     },
 };
 
@@ -69,7 +69,7 @@ pub fn run_ssz_test(test_name: &str, test: &SSZTest) -> anyhow::Result<bool> {
         "BlockSignatures" => {
             run_test::<BlockSignaturesJSON, BlockSignatures>(&test.value, &expected_ssz)
         }
-        "SignedBlock" => run_test::<SignedBlockJSON, SignedBlock>(&test.value, &expected_ssz),
+        "SignedBlock" => run_signed_block_test(&test.value, &expected_ssz),
         // Networking containers
         "Status" => run_test::<StatusJSON, StatusJSON>(&test.value, &expected_ssz),
         "BlocksByRootRequest" => {
@@ -91,6 +91,19 @@ pub fn run_ssz_test(test_name: &str, test: &SSZTest) -> anyhow::Result<bool> {
     }?;
 
     Ok(true)
+}
+
+fn run_signed_block_test(value: &serde_json::Value, expected_ssz: &[u8]) -> anyhow::Result<()> {
+    let json_value: SignedBlockJSON =
+        serde_json::from_value(value.clone()).context("Failed to deserialize JSON")?;
+
+    if json_value.proof.is_some() {
+        let typed_value = SignedBlockProofSSZ::try_from(&json_value)?;
+        return verify_ssz(&typed_value, expected_ssz);
+    }
+
+    let typed_value = SignedBlock::try_from(&json_value)?;
+    verify_ssz(&typed_value, expected_ssz)
 }
 
 /// Run SSZ test. J is the JSON type, T is the SSZ-encodable target type.
